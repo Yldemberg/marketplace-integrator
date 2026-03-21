@@ -6,6 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface HealthStatus {
+export interface SyncLog {
+  id: number;
+  userId: number;
+  platform: string;
   status: string;
+  message?: string | null;
+  syncedAt: Date;
 }

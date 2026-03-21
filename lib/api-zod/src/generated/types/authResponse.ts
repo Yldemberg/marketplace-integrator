@@ -5,7 +5,9 @@
  * Hub Marketplace API
  * OpenAPI spec version: 0.1.0
  */
+import type { UserInfo } from "./userInfo";
 
-export interface HealthStatus {
-  status: string;
+export interface AuthResponse {
+  user: UserInfo;
+  token: string;
 }
