@@ -9,6 +9,8 @@ import { Platform, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Colors } from "@/constants/colors";
 
+const useNativeTabs = Platform.OS === "ios" && isLiquidGlassAvailable();
+
 function NativeTabLayout() {
   return (
     <NativeTabs>
@@ -129,7 +131,7 @@ function ClassicTabLayout() {
 }
 
 export default function TabLayout() {
-  if (isLiquidGlassAvailable()) {
+  if (useNativeTabs) {
     return <NativeTabLayout />;
   }
   return <ClassicTabLayout />;
