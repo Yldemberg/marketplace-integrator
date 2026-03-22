@@ -1,12 +1,11 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
-import { router } from "expo-router";
+import * as Linking from "expo-linking";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Dimensions,
   FlatList,
   Platform,
   Pressable,
@@ -16,19 +15,12 @@ import {
   TextInput,
   View,
 } from "react-native";
-import Animated, {
-  FadeIn,
-  FadeOut,
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-} from "react-native-reanimated";
+import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Colors } from "@/constants/colors";
 import { useAuth } from "@/context/AuthContext";
 
 const BASE_URL = `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 type Question = {
   id: number;
@@ -45,20 +37,6 @@ type Question = {
   answeredAt: string | null;
 };
 
-const STATUS_LABELS: Record<string, string> = {
-  UNANSWERED: "Pendente",
-  ANSWERED: "Respondida",
-  CLOSED_UNANSWERED: "Encerrada",
-  UNDER_REVIEW: "Em revisão",
-};
-
-const STATUS_COLORS: Record<string, string> = {
-  UNANSWERED: Colors.warning,
-  ANSWERED: Colors.secondary,
-  CLOSED_UNANSWERED: Colors.textMuted,
-  UNDER_REVIEW: Colors.primary,
-};
-
 const FILTERS = ["Todas", "Pendente", "Respondida"];
 
 function QuestionCard({
@@ -69,24 +47,14 @@ function QuestionCard({
   onAnswer: () => void;
 }) {
   const isPending = question.status === "UNANSWERED" || question.status === "UNDER_REVIEW";
-  const statusColor = STATUS_COLORS[question.status] || Colors.textMuted;
-
-  const timeAgo = (dateStr: string) => {
-    const diff = Date.now() - new Date(dateStr).getTime();
-    const mins = Math.floor(diff / 60000);
-    if (mins < 60) return `${mins}m atrás`;
-    const hrs = Math.floor(mins / 60);
-    if (hrs < 24) return `${hrs}h atrás`;
-    const days = Math.floor(hrs / 24);
-    return `${days}d atrás`;
-  };
+  const isAnswered = question.status === "ANSWERED";
 
   return (
     <Pressable
-      style={({ pressed }) => [styles.card, { opacity: pressed ? 0.92 : 1 }]}
-      onPress={onAnswer}
+      style={({ pressed }) => [styles.card, { opacity: pressed ? 0.93 : 1 }]}
+      onPress={isPending ? onAnswer : undefined}
     >
-      <View style={styles.cardTop}>
+      <View style={styles.cardRow}>
         {question.thumbnail ? (
           <Image
             source={{ uri: question.thumbnail }}
@@ -95,52 +63,57 @@ function QuestionCard({
           />
         ) : (
           <View style={[styles.thumbnail, styles.thumbnailPlaceholder]}>
-            <Feather name="package" size={20} color={Colors.textMuted} />
+            <Feather name="package" size={22} color={Colors.textMuted} />
           </View>
         )}
 
-        <View style={styles.cardMeta}>
-          <View style={styles.cardMetaRow}>
-            <View style={[styles.statusBadge, { backgroundColor: statusColor + "22", borderColor: statusColor + "44" }]}>
-              <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
-              <Text style={[styles.statusText, { color: statusColor }]}>
-                {STATUS_LABELS[question.status] || question.status}
-              </Text>
-            </View>
-            <Text style={styles.timeAgo}>{timeAgo(question.createdAt)}</Text>
-          </View>
-          {question.loja && (
+        <View style={styles.cardInfo}>
+          {question.loja ? (
             <View style={styles.lojaRow}>
               <Feather name="shopping-bag" size={12} color={Colors.mercadolivre} />
-              <Text style={styles.lojaText}>{question.loja}</Text>
+              <Text style={styles.lojaText} numberOfLines={1}>{question.loja}</Text>
             </View>
-          )}
+          ) : null}
+
+          <Text style={styles.itemIdText} numberOfLines={1}>
+            ID: {question.itemId}
+          </Text>
+
+          {question.permalink ? (
+            <Pressable
+              style={styles.permalinkBtn}
+              onPress={() => Linking.openURL(question.permalink!)}
+              hitSlop={6}
+            >
+              <Feather name="external-link" size={11} color={Colors.primary} />
+              <Text style={styles.permalinkText} numberOfLines={1}>
+                Ver anúncio
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
       </View>
 
       <View style={styles.questionBox}>
-        <Feather name="help-circle" size={14} color={Colors.primary} />
+        <Feather name="help-circle" size={15} color={Colors.primary} />
         <Text style={styles.questionText}>{question.pergunta}</Text>
       </View>
-
-      {question.resposta ? (
-        <View style={styles.answerBox}>
-          <Feather name="check-circle" size={14} color={Colors.secondary} />
-          <Text style={styles.answerText} numberOfLines={2}>{question.resposta}</Text>
-        </View>
-      ) : null}
 
       {isPending && (
         <Pressable
           style={({ pressed }) => [styles.answerBtn, { opacity: pressed ? 0.85 : 1 }]}
-          onPress={(e) => {
-            e.stopPropagation();
-            onAnswer();
-          }}
+          onPress={onAnswer}
         >
           <Feather name="send" size={14} color="#fff" />
           <Text style={styles.answerBtnText}>Responder</Text>
         </Pressable>
+      )}
+
+      {isAnswered && (
+        <View style={styles.answeredBadge}>
+          <Feather name="check-circle" size={13} color={Colors.secondary} />
+          <Text style={styles.answeredBadgeText}>Respondida</Text>
+        </View>
       )}
     </Pressable>
   );
@@ -155,23 +128,19 @@ function AnswerModal({
   onClose: () => void;
   onSubmit: (resposta: string) => Promise<void>;
 }) {
-  const [text, setText] = useState(question.resposta || "");
+  const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
   const insets = useSafeAreaInsets();
-  const translateY = useSharedValue(0);
   const inputRef = useRef<TextInput>(null);
 
   useEffect(() => {
-    setTimeout(() => inputRef.current?.focus(), 400);
+    const t = setTimeout(() => inputRef.current?.focus(), 350);
+    return () => clearTimeout(t);
   }, []);
-
-  const animStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: translateY.value }],
-  }));
 
   const handleSubmit = async () => {
     if (!text.trim()) {
-      Alert.alert("Atenção", "Digite a resposta");
+      Alert.alert("Atenção", "Digite a resposta antes de enviar");
       return;
     }
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -187,30 +156,46 @@ function AnswerModal({
   };
 
   return (
-    <Animated.View style={[styles.modalOverlay]} entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)}>
+    <Animated.View
+      style={styles.modalOverlay}
+      entering={FadeIn.duration(200)}
+      exiting={FadeOut.duration(150)}
+    >
       <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-      <Animated.View
-        style={[
-          styles.modalSheet,
-          animStyle,
-          { paddingBottom: insets.bottom + 16 },
-        ]}
-      >
+      <View style={[styles.modalSheet, { paddingBottom: insets.bottom + 16 }]}>
         <View style={styles.modalHandle} />
+
         <View style={styles.modalHeader}>
           <Text style={styles.modalTitle}>Responder Pergunta</Text>
-          <Pressable onPress={onClose} hitSlop={10}>
+          <Pressable onPress={onClose} hitSlop={12}>
             <Feather name="x" size={22} color={Colors.text} />
           </Pressable>
         </View>
 
+        <View style={styles.modalProductRow}>
+          {question.thumbnail ? (
+            <Image source={{ uri: question.thumbnail }} style={styles.modalThumb} contentFit="cover" />
+          ) : null}
+          <View style={styles.modalProductInfo}>
+            {question.loja ? (
+              <Text style={styles.modalLoja} numberOfLines={1}>{question.loja}</Text>
+            ) : null}
+            <Text style={styles.modalItemId} numberOfLines={1}>ID: {question.itemId}</Text>
+            {question.permalink ? (
+              <Pressable onPress={() => Linking.openURL(question.permalink!)} hitSlop={6}>
+                <Text style={styles.modalPermalink} numberOfLines={1}>Ver anúncio ↗</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        </View>
+
         <View style={styles.modalQuestion}>
-          <Text style={styles.modalQuestionLabel}>Pergunta do cliente:</Text>
+          <Text style={styles.modalQuestionLabel}>Pergunta do cliente</Text>
           <Text style={styles.modalQuestionText}>{question.pergunta}</Text>
         </View>
 
         <View style={styles.modalInputGroup}>
-          <Text style={styles.modalInputLabel}>Sua resposta:</Text>
+          <Text style={styles.modalInputLabel}>Sua resposta</Text>
           <TextInput
             ref={inputRef}
             style={styles.modalTextArea}
@@ -241,13 +226,13 @@ function AnswerModal({
               <ActivityIndicator size="small" color="#fff" />
             ) : (
               <>
-                <Feather name="send" size={16} color="#fff" />
-                <Text style={styles.submitBtnText}>Enviar Resposta</Text>
+                <Feather name="send" size={15} color="#fff" />
+                <Text style={styles.submitBtnText}>Enviar</Text>
               </>
             )}
           </Pressable>
         </View>
-      </Animated.View>
+      </View>
     </Animated.View>
   );
 }
@@ -269,12 +254,15 @@ export default function QuestionsScreen() {
       });
       if (res.ok) {
         const data = await res.json();
-        setQuestions(data.sort((a: Question, b: Question) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        ));
+        setQuestions(
+          data.sort(
+            (a: Question, b: Question) =>
+              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          )
+        );
       }
-    } catch {
-    } finally {
+    } catch {}
+    finally {
       setLoading(false);
       setRefreshing(false);
     }
@@ -304,13 +292,18 @@ export default function QuestionsScreen() {
       throw new Error(data.message || "Erro ao enviar resposta");
     }
 
-    if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    if (Platform.OS !== "web")
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
     const updated = await res.json();
-    setQuestions((prev) => prev.map((q) => (q.id === updated.id ? updated : q)));
+    setQuestions((prev) =>
+      prev.map((q) => (q.id === updated.id ? updated : q))
+    );
   };
 
   const filteredQuestions = questions.filter((q) => {
-    if (filter === "Pendente") return q.status === "UNANSWERED" || q.status === "UNDER_REVIEW";
+    if (filter === "Pendente")
+      return q.status === "UNANSWERED" || q.status === "UNDER_REVIEW";
     if (filter === "Respondida") return q.status === "ANSWERED";
     return true;
   });
@@ -325,9 +318,11 @@ export default function QuestionsScreen() {
         <View>
           <Text style={styles.headerTitle}>Perguntas</Text>
           {pendingCount > 0 ? (
-            <Text style={styles.headerBadge}>{pendingCount} aguardando resposta</Text>
+            <Text style={styles.headerBadge}>
+              {pendingCount} aguardando resposta
+            </Text>
           ) : (
-            <Text style={styles.headerSub}>Perguntas do Mercado Livre</Text>
+            <Text style={styles.headerSub}>Mercado Livre</Text>
           )}
         </View>
         <Pressable onPress={onRefresh} hitSlop={8}>
@@ -342,7 +337,12 @@ export default function QuestionsScreen() {
             style={[styles.filterChip, filter === f && styles.filterChipActive]}
             onPress={() => setFilter(f)}
           >
-            <Text style={[styles.filterChipText, filter === f && styles.filterChipTextActive]}>
+            <Text
+              style={[
+                styles.filterChipText,
+                filter === f && styles.filterChipTextActive,
+              ]}
+            >
               {f}
             </Text>
           </Pressable>
@@ -365,7 +365,11 @@ export default function QuestionsScreen() {
           )}
           contentContainerStyle={styles.list}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={Colors.primary}
+            />
           }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
@@ -430,7 +434,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   filterChip: {
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingVertical: 7,
     borderRadius: 20,
     backgroundColor: Colors.backgroundTertiary,
@@ -456,81 +460,74 @@ const styles = StyleSheet.create({
   },
   list: {
     paddingHorizontal: 20,
-    paddingBottom: 100,
+    paddingBottom: 110,
     gap: 12,
   },
+
   card: {
     backgroundColor: Colors.card,
     borderRadius: 16,
     padding: 14,
     borderWidth: 1,
     borderColor: Colors.cardBorder,
-    gap: 10,
+    gap: 12,
   },
-  cardTop: {
+  cardRow: {
     flexDirection: "row",
     gap: 12,
     alignItems: "flex-start",
   },
   thumbnail: {
-    width: 52,
-    height: 52,
-    borderRadius: 10,
+    width: 64,
+    height: 64,
+    borderRadius: 12,
     backgroundColor: Colors.backgroundTertiary,
+    flexShrink: 0,
   },
   thumbnailPlaceholder: {
     alignItems: "center",
     justifyContent: "center",
   },
-  cardMeta: {
+  cardInfo: {
     flex: 1,
     gap: 4,
-  },
-  cardMetaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  statusBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  statusText: {
-    fontSize: 11,
-    fontFamily: "Inter_600SemiBold",
-  },
-  timeAgo: {
-    fontSize: 11,
-    fontFamily: "Inter_400Regular",
-    color: Colors.textMuted,
+    justifyContent: "center",
   },
   lojaRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
+    gap: 5,
   },
   lojaText: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.mercadolivre,
+    flex: 1,
+  },
+  itemIdText: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textMuted,
+  },
+  permalinkBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 2,
+  },
+  permalinkText: {
     fontSize: 12,
     fontFamily: "Inter_500Medium",
-    color: Colors.mercadolivre,
+    color: Colors.primary,
   },
+
   questionBox: {
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 8,
     backgroundColor: Colors.backgroundTertiary,
     borderRadius: 10,
-    padding: 10,
+    padding: 12,
   },
   questionText: {
     flex: 1,
@@ -539,47 +536,49 @@ const styles = StyleSheet.create({
     color: Colors.text,
     lineHeight: 20,
   },
-  answerBox: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 8,
-    backgroundColor: Colors.secondary + "11",
-    borderRadius: 10,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: Colors.secondary + "22",
-  },
-  answerText: {
-    flex: 1,
-    fontSize: 13,
-    fontFamily: "Inter_400Regular",
-    color: Colors.secondary,
-    lineHeight: 18,
-  },
+
   answerBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 6,
+    gap: 7,
     backgroundColor: Colors.primary,
-    borderRadius: 10,
-    paddingVertical: 10,
+    borderRadius: 12,
+    paddingVertical: 11,
   },
   answerBtnText: {
     fontSize: 14,
     fontFamily: "Inter_600SemiBold",
     color: "#fff",
   },
+  answeredBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: Colors.secondary + "15",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.secondary + "30",
+    alignSelf: "flex-start",
+  },
+  answeredBadgeText: {
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.secondary,
+  },
+
   emptyContainer: {
     alignItems: "center",
-    paddingTop: 60,
+    paddingTop: 64,
     gap: 12,
     paddingHorizontal: 32,
   },
   emptyIconWrap: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 76,
+    height: 76,
+    borderRadius: 38,
     backgroundColor: Colors.backgroundTertiary,
     alignItems: "center",
     justifyContent: "center",
@@ -596,9 +595,10 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 20,
   },
+
   modalOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.6)",
+    backgroundColor: "rgba(0,0,0,0.65)",
     justifyContent: "flex-end",
     zIndex: 999,
   },
@@ -629,6 +629,39 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
     color: Colors.text,
   },
+  modalProductRow: {
+    flexDirection: "row",
+    gap: 12,
+    alignItems: "center",
+    backgroundColor: Colors.backgroundTertiary,
+    borderRadius: 12,
+    padding: 12,
+  },
+  modalThumb: {
+    width: 52,
+    height: 52,
+    borderRadius: 10,
+    backgroundColor: Colors.card,
+  },
+  modalProductInfo: {
+    flex: 1,
+    gap: 3,
+  },
+  modalLoja: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.mercadolivre,
+  },
+  modalItemId: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textMuted,
+  },
+  modalPermalink: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+    color: Colors.primary,
+  },
   modalQuestion: {
     backgroundColor: Colors.backgroundTertiary,
     borderRadius: 12,
@@ -649,7 +682,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   modalInputGroup: {
-    gap: 8,
+    gap: 6,
   },
   modalInputLabel: {
     fontSize: 13,
@@ -665,7 +698,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: "Inter_400Regular",
     color: Colors.text,
-    height: 120,
+    height: 110,
   },
   charCount: {
     fontSize: 11,
