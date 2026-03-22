@@ -5,7 +5,7 @@ import { Icon, Label, NativeTabs } from "expo-router/unstable-native-tabs";
 import { SymbolView } from "expo-symbols";
 import { Feather } from "@expo/vector-icons";
 import React from "react";
-import { Platform, StyleSheet, View, useColorScheme } from "react-native";
+import { Platform, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Colors } from "@/constants/colors";
 
@@ -19,6 +19,10 @@ function NativeTabLayout() {
       <NativeTabs.Trigger name="inventory">
         <Icon sf={{ default: "cube", selected: "cube.fill" }} />
         <Label>Estoque</Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="questions">
+        <Icon sf={{ default: "message.circle", selected: "message.circle.fill" }} />
+        <Label>Perguntas</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="sync">
         <Icon sf={{ default: "arrow.triangle.2.circlepath", selected: "arrow.triangle.2.circlepath.circle.fill" }} />
@@ -81,6 +85,18 @@ function ClassicTabLayout() {
               <SymbolView name="cube" tintColor={color} size={24} />
             ) : (
               <Feather name="package" size={22} color={color} />
+            ),
+        }}
+      />
+      <Tabs.Screen
+        name="questions"
+        options={{
+          title: "Perguntas",
+          tabBarIcon: ({ color }) =>
+            isIOS ? (
+              <SymbolView name="message.circle" tintColor={color} size={24} />
+            ) : (
+              <Feather name="message-circle" size={22} color={color} />
             ),
         }}
       />

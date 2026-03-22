@@ -112,6 +112,48 @@ export interface SyncResult {
   syncedAt: string;
 }
 
+export interface N8nQuestionPayload {
+  pergunta: string;
+  resposta?: string | null;
+  status: string;
+  item_id: string;
+  thumbnail?: string | null;
+  permalink?: string | null;
+  loja?: string | null;
+  ml_question_id: string;
+  userId?: number;
+}
+
+export interface Question {
+  id: number;
+  userId: number;
+  mlQuestionId: string;
+  pergunta: string;
+  resposta?: string | null;
+  status: string;
+  itemId: string;
+  thumbnail?: string | null;
+  permalink?: string | null;
+  loja?: string | null;
+  createdAt: string;
+  answeredAt?: string | null;
+}
+
+export interface AnswerRequest {
+  resposta: string;
+  userId: number;
+}
+
+export interface OAuthUrlResponse {
+  url: string;
+}
+
+export interface MlConnectionStatus {
+  connected: boolean;
+  nickname?: string | null;
+  mlUserId?: string | null;
+}
+
 export type GetProductsParams = {
   userId: number;
 };
@@ -121,5 +163,27 @@ export type GetDashboardParams = {
 };
 
 export type GetSyncLogsParams = {
+  userId: number;
+};
+
+export type GetQuestionsParams = {
+  userId: number;
+  status?: string;
+};
+
+export type GetMlOAuthUrlParams = {
+  userId: number;
+};
+
+export type MlOAuthCallbackParams = {
+  code: string;
+  state: string;
+};
+
+export type GetMlConnectionStatusParams = {
+  userId: number;
+};
+
+export type DisconnectMlParams = {
   userId: number;
 };

@@ -176,3 +176,129 @@ export const GetSyncLogsResponseItem = zod.object({
   syncedAt: zod.date(),
 });
 export const GetSyncLogsResponse = zod.array(GetSyncLogsResponseItem);
+
+/**
+ * @summary Receive question from n8n webhook
+ */
+export const ReceiveQuestionBody = zod.object({
+  pergunta: zod.string(),
+  resposta: zod.string().nullish(),
+  status: zod.string(),
+  item_id: zod.string(),
+  thumbnail: zod.string().nullish(),
+  permalink: zod.string().nullish(),
+  loja: zod.string().nullish(),
+  ml_question_id: zod.string(),
+  userId: zod.number().optional(),
+});
+
+export const ReceiveQuestionResponse = zod.object({
+  id: zod.number(),
+  userId: zod.number(),
+  mlQuestionId: zod.string(),
+  pergunta: zod.string(),
+  resposta: zod.string().nullish(),
+  status: zod.string(),
+  itemId: zod.string(),
+  thumbnail: zod.string().nullish(),
+  permalink: zod.string().nullish(),
+  loja: zod.string().nullish(),
+  createdAt: zod.date(),
+  answeredAt: zod.date().nullish(),
+});
+
+/**
+ * @summary Get questions for user
+ */
+export const GetQuestionsQueryParams = zod.object({
+  userId: zod.coerce.number(),
+  status: zod.coerce.string().optional(),
+});
+
+export const GetQuestionsResponseItem = zod.object({
+  id: zod.number(),
+  userId: zod.number(),
+  mlQuestionId: zod.string(),
+  pergunta: zod.string(),
+  resposta: zod.string().nullish(),
+  status: zod.string(),
+  itemId: zod.string(),
+  thumbnail: zod.string().nullish(),
+  permalink: zod.string().nullish(),
+  loja: zod.string().nullish(),
+  createdAt: zod.date(),
+  answeredAt: zod.date().nullish(),
+});
+export const GetQuestionsResponse = zod.array(GetQuestionsResponseItem);
+
+/**
+ * @summary Answer a question and forward to webhook
+ */
+export const AnswerQuestionParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const AnswerQuestionBody = zod.object({
+  resposta: zod.string(),
+  userId: zod.number(),
+});
+
+export const AnswerQuestionResponse = zod.object({
+  id: zod.number(),
+  userId: zod.number(),
+  mlQuestionId: zod.string(),
+  pergunta: zod.string(),
+  resposta: zod.string().nullish(),
+  status: zod.string(),
+  itemId: zod.string(),
+  thumbnail: zod.string().nullish(),
+  permalink: zod.string().nullish(),
+  loja: zod.string().nullish(),
+  createdAt: zod.date(),
+  answeredAt: zod.date().nullish(),
+});
+
+/**
+ * @summary Get Mercado Livre OAuth URL
+ */
+export const GetMlOAuthUrlQueryParams = zod.object({
+  userId: zod.coerce.number(),
+});
+
+export const GetMlOAuthUrlResponse = zod.object({
+  url: zod.string(),
+});
+
+/**
+ * @summary Handle Mercado Livre OAuth callback
+ */
+export const MlOAuthCallbackQueryParams = zod.object({
+  code: zod.coerce.string(),
+  state: zod.coerce.string(),
+});
+
+export const MlOAuthCallbackResponse = zod.object({
+  connected: zod.boolean(),
+  nickname: zod.string().nullish(),
+  mlUserId: zod.string().nullish(),
+});
+
+/**
+ * @summary Get Mercado Livre connection status
+ */
+export const GetMlConnectionStatusQueryParams = zod.object({
+  userId: zod.coerce.number(),
+});
+
+export const GetMlConnectionStatusResponse = zod.object({
+  connected: zod.boolean(),
+  nickname: zod.string().nullish(),
+  mlUserId: zod.string().nullish(),
+});
+
+/**
+ * @summary Disconnect Mercado Livre
+ */
+export const DisconnectMlQueryParams = zod.object({
+  userId: zod.coerce.number(),
+});

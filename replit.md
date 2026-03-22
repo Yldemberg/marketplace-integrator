@@ -43,13 +43,29 @@ artifacts-monorepo/
 - **Dashboard**: Stats overview (products, stock, low stock, synced platforms)
 - **Inventory**: Product management with full CRUD, search, stock badges
 - **Sync**: Synchronize products with Mercado Livre, Shopee, and Amazon
-- **Profile**: User account info, connected platforms, logout
+- **Questions**: Customer question management from Mercado Livre (via n8n webhook), with answer modal and auto-forwarding to feedback webhook
+- **Profile**: User account info, ML OAuth connection, logout
+
+## ML Questions Feature
+
+- **Webhook receiver**: `POST /api/questions/webhook` — receives from n8n with fields: `pergunta, resposta, status, item_id, thumbnail, permalink, loja, ml_question_id, userId`
+- **List questions**: `GET /api/questions?userId=X` — supports `status` filter
+- **Answer question**: `POST /api/questions/:id/answer` — saves answer, POSTs to feedback webhook at `https://primary-production-8e04b.up.railway.app/webhook/feedback_pergunta_cliente`
+
+## ML OAuth
+
+- `GET /api/ml-oauth/connect?userId=X` — returns ML auth URL (requires `ML_CLIENT_ID`, `ML_REDIRECT_URI` env vars)
+- `GET /api/ml-oauth/callback?code=X&state=X` — exchanges code for tokens (requires `ML_CLIENT_SECRET` env var)
+- `GET /api/ml-oauth/status?userId=X` — returns `{ connected, nickname, mlUserId }`
+- `DELETE /api/ml-oauth/disconnect?userId=X` — removes stored tokens
 
 ## Database Schema
 
 - `users` - User accounts (id, email, name, passwordHash, createdAt)
 - `products` - Product catalog (id, userId, name, sku, price, stockQuantity, category, mercadoLivreId, shopeeId, amazonId, ...)
 - `sync_logs` - Marketplace sync history (id, userId, platform, status, message, syncedAt)
+- `questions` - ML customer questions (id, userId, mlQuestionId, pergunta, resposta, status, itemId, thumbnail, permalink, loja, createdAt, answeredAt)
+- `ml_tokens` - ML OAuth tokens (id, userId, accessToken, refreshToken, expiresAt, mlUserId, mlNickname, updatedAt)
 
 ## API Routes
 

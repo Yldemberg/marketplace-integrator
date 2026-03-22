@@ -6,16 +6,26 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from "./answerRequest";
 export * from "./authResponse";
 export * from "./createProductRequest";
 export * from "./dashboardStats";
+export * from "./disconnectMlParams";
 export * from "./errorResponse";
 export * from "./getDashboardParams";
+export * from "./getMlConnectionStatusParams";
+export * from "./getMlOAuthUrlParams";
 export * from "./getProductsParams";
+export * from "./getQuestionsParams";
 export * from "./getSyncLogsParams";
 export * from "./healthStatus";
 export * from "./loginRequest";
+export * from "./mlConnectionStatus";
+export * from "./mlOAuthCallbackParams";
+export * from "./n8nQuestionPayload";
+export * from "./oAuthUrlResponse";
 export * from "./product";
+export * from "./question";
 export * from "./registerRequest";
 export * from "./syncLog";
 export * from "./syncRequest";

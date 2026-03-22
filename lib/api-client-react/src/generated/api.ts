@@ -17,16 +17,26 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
+  AnswerRequest,
   AuthResponse,
   CreateProductRequest,
   DashboardStats,
+  DisconnectMlParams,
   ErrorResponse,
   GetDashboardParams,
+  GetMlConnectionStatusParams,
+  GetMlOAuthUrlParams,
   GetProductsParams,
+  GetQuestionsParams,
   GetSyncLogsParams,
   HealthStatus,
   LoginRequest,
+  MlConnectionStatus,
+  MlOAuthCallbackParams,
+  N8nQuestionPayload,
+  OAuthUrlResponse,
   Product,
+  Question,
   RegisterRequest,
   SyncLog,
   SyncRequest,
@@ -914,3 +924,654 @@ export function useGetSyncLogs<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary Receive question from n8n webhook
+ */
+export const getReceiveQuestionUrl = () => {
+  return `/api/questions/webhook`;
+};
+
+export const receiveQuestion = async (
+  n8nQuestionPayload: N8nQuestionPayload,
+  options?: RequestInit,
+): Promise<Question> => {
+  return customFetch<Question>(getReceiveQuestionUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(n8nQuestionPayload),
+  });
+};
+
+export const getReceiveQuestionMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof receiveQuestion>>,
+    TError,
+    { data: BodyType<N8nQuestionPayload> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof receiveQuestion>>,
+  TError,
+  { data: BodyType<N8nQuestionPayload> },
+  TContext
+> => {
+  const mutationKey = ["receiveQuestion"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof receiveQuestion>>,
+    { data: BodyType<N8nQuestionPayload> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return receiveQuestion(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ReceiveQuestionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof receiveQuestion>>
+>;
+export type ReceiveQuestionMutationBody = BodyType<N8nQuestionPayload>;
+export type ReceiveQuestionMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Receive question from n8n webhook
+ */
+export const useReceiveQuestion = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof receiveQuestion>>,
+    TError,
+    { data: BodyType<N8nQuestionPayload> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof receiveQuestion>>,
+  TError,
+  { data: BodyType<N8nQuestionPayload> },
+  TContext
+> => {
+  return useMutation(getReceiveQuestionMutationOptions(options));
+};
+
+/**
+ * @summary Get questions for user
+ */
+export const getGetQuestionsUrl = (params: GetQuestionsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/questions?${stringifiedParams}`
+    : `/api/questions`;
+};
+
+export const getQuestions = async (
+  params: GetQuestionsParams,
+  options?: RequestInit,
+): Promise<Question[]> => {
+  return customFetch<Question[]>(getGetQuestionsUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetQuestionsQueryKey = (params?: GetQuestionsParams) => {
+  return [`/api/questions`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetQuestionsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getQuestions>>,
+  TError = ErrorType<unknown>,
+>(
+  params: GetQuestionsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getQuestions>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetQuestionsQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getQuestions>>> = ({
+    signal,
+  }) => getQuestions(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getQuestions>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetQuestionsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getQuestions>>
+>;
+export type GetQuestionsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get questions for user
+ */
+
+export function useGetQuestions<
+  TData = Awaited<ReturnType<typeof getQuestions>>,
+  TError = ErrorType<unknown>,
+>(
+  params: GetQuestionsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getQuestions>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetQuestionsQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Answer a question and forward to webhook
+ */
+export const getAnswerQuestionUrl = (id: number) => {
+  return `/api/questions/${id}/answer`;
+};
+
+export const answerQuestion = async (
+  id: number,
+  answerRequest: AnswerRequest,
+  options?: RequestInit,
+): Promise<Question> => {
+  return customFetch<Question>(getAnswerQuestionUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(answerRequest),
+  });
+};
+
+export const getAnswerQuestionMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof answerQuestion>>,
+    TError,
+    { id: number; data: BodyType<AnswerRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof answerQuestion>>,
+  TError,
+  { id: number; data: BodyType<AnswerRequest> },
+  TContext
+> => {
+  const mutationKey = ["answerQuestion"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof answerQuestion>>,
+    { id: number; data: BodyType<AnswerRequest> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return answerQuestion(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AnswerQuestionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof answerQuestion>>
+>;
+export type AnswerQuestionMutationBody = BodyType<AnswerRequest>;
+export type AnswerQuestionMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Answer a question and forward to webhook
+ */
+export const useAnswerQuestion = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof answerQuestion>>,
+    TError,
+    { id: number; data: BodyType<AnswerRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof answerQuestion>>,
+  TError,
+  { id: number; data: BodyType<AnswerRequest> },
+  TContext
+> => {
+  return useMutation(getAnswerQuestionMutationOptions(options));
+};
+
+/**
+ * @summary Get Mercado Livre OAuth URL
+ */
+export const getGetMlOAuthUrlUrl = (params: GetMlOAuthUrlParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/ml-oauth/connect?${stringifiedParams}`
+    : `/api/ml-oauth/connect`;
+};
+
+export const getMlOAuthUrl = async (
+  params: GetMlOAuthUrlParams,
+  options?: RequestInit,
+): Promise<OAuthUrlResponse> => {
+  return customFetch<OAuthUrlResponse>(getGetMlOAuthUrlUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetMlOAuthUrlQueryKey = (params?: GetMlOAuthUrlParams) => {
+  return [`/api/ml-oauth/connect`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetMlOAuthUrlQueryOptions = <
+  TData = Awaited<ReturnType<typeof getMlOAuthUrl>>,
+  TError = ErrorType<unknown>,
+>(
+  params: GetMlOAuthUrlParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getMlOAuthUrl>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetMlOAuthUrlQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getMlOAuthUrl>>> = ({
+    signal,
+  }) => getMlOAuthUrl(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getMlOAuthUrl>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetMlOAuthUrlQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getMlOAuthUrl>>
+>;
+export type GetMlOAuthUrlQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get Mercado Livre OAuth URL
+ */
+
+export function useGetMlOAuthUrl<
+  TData = Awaited<ReturnType<typeof getMlOAuthUrl>>,
+  TError = ErrorType<unknown>,
+>(
+  params: GetMlOAuthUrlParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getMlOAuthUrl>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetMlOAuthUrlQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Handle Mercado Livre OAuth callback
+ */
+export const getMlOAuthCallbackUrl = (params: MlOAuthCallbackParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/ml-oauth/callback?${stringifiedParams}`
+    : `/api/ml-oauth/callback`;
+};
+
+export const mlOAuthCallback = async (
+  params: MlOAuthCallbackParams,
+  options?: RequestInit,
+): Promise<MlConnectionStatus> => {
+  return customFetch<MlConnectionStatus>(getMlOAuthCallbackUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getMlOAuthCallbackQueryKey = (params?: MlOAuthCallbackParams) => {
+  return [`/api/ml-oauth/callback`, ...(params ? [params] : [])] as const;
+};
+
+export const getMlOAuthCallbackQueryOptions = <
+  TData = Awaited<ReturnType<typeof mlOAuthCallback>>,
+  TError = ErrorType<unknown>,
+>(
+  params: MlOAuthCallbackParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof mlOAuthCallback>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getMlOAuthCallbackQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof mlOAuthCallback>>> = ({
+    signal,
+  }) => mlOAuthCallback(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof mlOAuthCallback>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type MlOAuthCallbackQueryResult = NonNullable<
+  Awaited<ReturnType<typeof mlOAuthCallback>>
+>;
+export type MlOAuthCallbackQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Handle Mercado Livre OAuth callback
+ */
+
+export function useMlOAuthCallback<
+  TData = Awaited<ReturnType<typeof mlOAuthCallback>>,
+  TError = ErrorType<unknown>,
+>(
+  params: MlOAuthCallbackParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof mlOAuthCallback>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getMlOAuthCallbackQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get Mercado Livre connection status
+ */
+export const getGetMlConnectionStatusUrl = (
+  params: GetMlConnectionStatusParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/ml-oauth/status?${stringifiedParams}`
+    : `/api/ml-oauth/status`;
+};
+
+export const getMlConnectionStatus = async (
+  params: GetMlConnectionStatusParams,
+  options?: RequestInit,
+): Promise<MlConnectionStatus> => {
+  return customFetch<MlConnectionStatus>(getGetMlConnectionStatusUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetMlConnectionStatusQueryKey = (
+  params?: GetMlConnectionStatusParams,
+) => {
+  return [`/api/ml-oauth/status`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetMlConnectionStatusQueryOptions = <
+  TData = Awaited<ReturnType<typeof getMlConnectionStatus>>,
+  TError = ErrorType<unknown>,
+>(
+  params: GetMlConnectionStatusParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getMlConnectionStatus>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetMlConnectionStatusQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getMlConnectionStatus>>
+  > = ({ signal }) =>
+    getMlConnectionStatus(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getMlConnectionStatus>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetMlConnectionStatusQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getMlConnectionStatus>>
+>;
+export type GetMlConnectionStatusQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get Mercado Livre connection status
+ */
+
+export function useGetMlConnectionStatus<
+  TData = Awaited<ReturnType<typeof getMlConnectionStatus>>,
+  TError = ErrorType<unknown>,
+>(
+  params: GetMlConnectionStatusParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getMlConnectionStatus>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetMlConnectionStatusQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Disconnect Mercado Livre
+ */
+export const getDisconnectMlUrl = (params: DisconnectMlParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/ml-oauth/disconnect?${stringifiedParams}`
+    : `/api/ml-oauth/disconnect`;
+};
+
+export const disconnectMl = async (
+  params: DisconnectMlParams,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getDisconnectMlUrl(params), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDisconnectMlMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof disconnectMl>>,
+    TError,
+    { params: DisconnectMlParams },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof disconnectMl>>,
+  TError,
+  { params: DisconnectMlParams },
+  TContext
+> => {
+  const mutationKey = ["disconnectMl"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof disconnectMl>>,
+    { params: DisconnectMlParams }
+  > = (props) => {
+    const { params } = props ?? {};
+
+    return disconnectMl(params, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DisconnectMlMutationResult = NonNullable<
+  Awaited<ReturnType<typeof disconnectMl>>
+>;
+
+export type DisconnectMlMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Disconnect Mercado Livre
+ */
+export const useDisconnectMl = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof disconnectMl>>,
+    TError,
+    { params: DisconnectMlParams },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof disconnectMl>>,
+  TError,
+  { params: DisconnectMlParams },
+  TContext
+> => {
+  return useMutation(getDisconnectMlMutationOptions(options));
+};

@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import * as Haptics from "expo-haptics";
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Alert,
   Platform,
@@ -10,10 +10,14 @@ import {
   StyleSheet,
   Text,
   View,
+  ActivityIndicator,
+  Linking,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/context/AuthContext";
 import { Colors } from "@/constants/colors";
+
+const BASE_URL = `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
 
 function MenuItem({
   icon,
@@ -46,15 +50,77 @@ function MenuItem({
   );
 }
 
-const PLATFORMS = [
-  { id: "mercadolivre", name: "Mercado Livre", color: Colors.mercadolivre },
-  { id: "shopee", name: "Shopee", color: Colors.shopee },
-  { id: "amazon", name: "Amazon", color: Colors.amazon },
-];
+type MlStatus = { connected: boolean; nickname: string | null; mlUserId: string | null };
 
 export default function ProfileScreen() {
-  const { user, logout } = useAuth();
+  const { user, token, logout } = useAuth();
   const insets = useSafeAreaInsets();
+  const [mlStatus, setMlStatus] = useState<MlStatus | null>(null);
+  const [mlLoading, setMlLoading] = useState(false);
+
+  const fetchMlStatus = useCallback(async () => {
+    if (!user) return;
+    try {
+      const res = await fetch(`${BASE_URL}/api/ml-oauth/status?userId=${user.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        setMlStatus(await res.json());
+      }
+    } catch {}
+  }, [user, token]);
+
+  useEffect(() => {
+    fetchMlStatus();
+  }, [fetchMlStatus]);
+
+  const handleMlConnect = async () => {
+    if (!user) return;
+    if (mlStatus?.connected) {
+      Alert.alert(
+        "Desconectar Mercado Livre",
+        `Deseja desconectar a conta ${mlStatus.nickname || ""}?`,
+        [
+          { text: "Cancelar", style: "cancel" },
+          {
+            text: "Desconectar",
+            style: "destructive",
+            onPress: async () => {
+              setMlLoading(true);
+              try {
+                await fetch(`${BASE_URL}/api/ml-oauth/disconnect?userId=${user.id}`, {
+                  method: "DELETE",
+                  headers: { Authorization: `Bearer ${token}` },
+                });
+                setMlStatus({ connected: false, nickname: null, mlUserId: null });
+              } finally {
+                setMlLoading(false);
+              }
+            },
+          },
+        ]
+      );
+      return;
+    }
+
+    setMlLoading(true);
+    try {
+      const res = await fetch(`${BASE_URL}/api/ml-oauth/connect?userId=${user.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const { url } = await res.json();
+        await Linking.openURL(url);
+        setTimeout(() => fetchMlStatus(), 3000);
+      } else {
+        Alert.alert("Erro", "Não foi possível iniciar a autenticação do Mercado Livre");
+      }
+    } catch (err) {
+      Alert.alert("Erro", "Falha ao conectar com Mercado Livre");
+    } finally {
+      setMlLoading(false);
+    }
+  };
 
   const handleLogout = () => {
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -81,6 +147,24 @@ export default function ProfileScreen() {
     .map((n) => n.charAt(0).toUpperCase())
     .join("") ?? "?";
 
+  const MlBadge = () => {
+    if (mlLoading) return <ActivityIndicator size="small" color={Colors.primary} />;
+    if (mlStatus?.connected) {
+      return (
+        <View style={[styles.connectedBadge, { backgroundColor: Colors.secondary + "22" }]}>
+          <Text style={[styles.connectedText, { color: Colors.secondary }]}>
+            {mlStatus.nickname || "Conectado"}
+          </Text>
+        </View>
+      );
+    }
+    return (
+      <View style={[styles.connectedBadge, { backgroundColor: Colors.warning + "22" }]}>
+        <Text style={[styles.connectedText, { color: Colors.warning }]}>Conectar</Text>
+      </View>
+    );
+  };
+
   return (
     <ScrollView
       style={[styles.container, { paddingTop: insets.top }]}
@@ -100,15 +184,32 @@ export default function ProfileScreen() {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Plataformas Conectadas</Text>
-        <View style={styles.platformsGrid}>
-          {PLATFORMS.map((p) => (
-            <View key={p.id} style={styles.platformChip}>
-              <View style={[styles.platformDot, { backgroundColor: p.color }]} />
-              <Text style={styles.platformChipName}>{p.name}</Text>
-              <Feather name="check" size={14} color={Colors.secondary} />
-            </View>
-          ))}
+        <Text style={styles.sectionTitle}>Integrações</Text>
+        <View style={styles.menuGroup}>
+          <MenuItem
+            icon="shopping-bag"
+            label="Mercado Livre"
+            onPress={handleMlConnect}
+            right={<MlBadge />}
+          />
+          <MenuItem
+            icon="shopping-cart"
+            label="Shopee"
+            right={
+              <View style={[styles.connectedBadge, { backgroundColor: Colors.textMuted + "22" }]}>
+                <Text style={[styles.connectedText, { color: Colors.textMuted }]}>Em breve</Text>
+              </View>
+            }
+          />
+          <MenuItem
+            icon="box"
+            label="Amazon"
+            right={
+              <View style={[styles.connectedBadge, { backgroundColor: Colors.textMuted + "22" }]}>
+                <Text style={[styles.connectedText, { color: Colors.textMuted }]}>Em breve</Text>
+              </View>
+            }
+          />
         </View>
       </View>
 
@@ -129,33 +230,6 @@ export default function ProfileScreen() {
             icon="shield"
             label="Segurança"
             onPress={() => Alert.alert("Em breve", "Esta funcionalidade estará disponível em breve")}
-          />
-        </View>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Integrações</Text>
-        <View style={styles.menuGroup}>
-          <MenuItem
-            icon="shopping-bag"
-            label="Mercado Livre"
-            right={<View style={[styles.connectedBadge, { backgroundColor: Colors.secondary + "22" }]}>
-              <Text style={[styles.connectedText, { color: Colors.secondary }]}>Conectado</Text>
-            </View>}
-          />
-          <MenuItem
-            icon="shopping-cart"
-            label="Shopee"
-            right={<View style={[styles.connectedBadge, { backgroundColor: Colors.secondary + "22" }]}>
-              <Text style={[styles.connectedText, { color: Colors.secondary }]}>Conectado</Text>
-            </View>}
-          />
-          <MenuItem
-            icon="box"
-            label="Amazon"
-            right={<View style={[styles.connectedBadge, { backgroundColor: Colors.secondary + "22" }]}>
-              <Text style={[styles.connectedText, { color: Colors.secondary }]}>Conectado</Text>
-            </View>}
           />
         </View>
       </View>
@@ -240,30 +314,6 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 0.8,
     marginBottom: 10,
-  },
-  platformsGrid: {
-    gap: 8,
-  },
-  platformChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: Colors.card,
-    borderRadius: 12,
-    padding: 14,
-    gap: 10,
-    borderWidth: 1,
-    borderColor: Colors.cardBorder,
-  },
-  platformDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  platformChipName: {
-    flex: 1,
-    fontSize: 14,
-    fontFamily: "Inter_500Medium",
-    color: Colors.text,
   },
   menuGroup: {
     backgroundColor: Colors.card,

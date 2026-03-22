@@ -15,6 +15,10 @@ tags:
     description: Product management
   - name: sync
     description: Marketplace synchronization
+  - name: questions
+    description: Mercado Livre customer questions
+  - name: ml-oauth
+    description: Mercado Livre OAuth
 paths:
   /healthz:
     get:
@@ -213,6 +217,153 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/SyncLog"
+
+  /questions/webhook:
+    post:
+      operationId: receiveQuestion
+      tags: [questions]
+      summary: Receive question from n8n webhook
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/N8nQuestionPayload"
+      responses:
+        "200":
+          description: Question received
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Question"
+
+  /questions:
+    get:
+      operationId: getQuestions
+      tags: [questions]
+      summary: Get questions for user
+      parameters:
+        - name: userId
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of questions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Question"
+
+  /questions/{id}/answer:
+    post:
+      operationId: answerQuestion
+      tags: [questions]
+      summary: Answer a question and forward to webhook
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnswerRequest"
+      responses:
+        "200":
+          description: Question answered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Question"
+
+  /ml-oauth/connect:
+    get:
+      operationId: getMlOAuthUrl
+      tags: [ml-oauth]
+      summary: Get Mercado Livre OAuth URL
+      parameters:
+        - name: userId
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OAuth URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OAuthUrlResponse"
+
+  /ml-oauth/callback:
+    get:
+      operationId: mlOAuthCallback
+      tags: [ml-oauth]
+      summary: Handle Mercado Livre OAuth callback
+      parameters:
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Token stored
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MlConnectionStatus"
+
+  /ml-oauth/status:
+    get:
+      operationId: getMlConnectionStatus
+      tags: [ml-oauth]
+      summary: Get Mercado Livre connection status
+      parameters:
+        - name: userId
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Connection status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MlConnectionStatus"
+
+  /ml-oauth/disconnect:
+    delete:
+      operationId: disconnectMl
+      tags: [ml-oauth]
+      summary: Disconnect Mercado Livre
+      parameters:
+        - name: userId
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Disconnected
 
 components:
   schemas:
@@ -463,3 +614,110 @@ components:
         - platform
         - status
         - syncedAt
+
+    N8nQuestionPayload:
+      type: object
+      properties:
+        pergunta:
+          type: string
+        resposta:
+          type: string
+          nullable: true
+        status:
+          type: string
+        item_id:
+          type: string
+        thumbnail:
+          type: string
+          nullable: true
+        permalink:
+          type: string
+          nullable: true
+        loja:
+          type: string
+          nullable: true
+        ml_question_id:
+          type: string
+        userId:
+          type: integer
+      required:
+        - pergunta
+        - status
+        - item_id
+        - ml_question_id
+
+    Question:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        mlQuestionId:
+          type: string
+        pergunta:
+          type: string
+        resposta:
+          type: string
+          nullable: true
+        status:
+          type: string
+        itemId:
+          type: string
+        thumbnail:
+          type: string
+          nullable: true
+        permalink:
+          type: string
+          nullable: true
+        loja:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        answeredAt:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+        - id
+        - userId
+        - mlQuestionId
+        - pergunta
+        - status
+        - itemId
+        - createdAt
+
+    AnswerRequest:
+      type: object
+      properties:
+        resposta:
+          type: string
+        userId:
+          type: integer
+      required:
+        - resposta
+        - userId
+
+    OAuthUrlResponse:
+      type: object
+      properties:
+        url:
+          type: string
+      required:
+        - url
+
+    MlConnectionStatus:
+      type: object
+      properties:
+        connected:
+          type: boolean
+        nickname:
+          type: string
+          nullable: true
+        mlUserId:
+          type: string
+          nullable: true
+      required:
+        - connected
