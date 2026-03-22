@@ -109,34 +109,71 @@ const appName = getAppName();
 
 const API_PORT = 8080;
 
-function proxyToApi(req, res) {
-  const options = {
-    hostname: "localhost",
-    port: API_PORT,
-    path: req.url,
-    method: req.method,
-    headers: req.headers,
-  };
+const API_PREFIXES = [
+  "/api/",
+  "/api",
+  "/healthz",
+  "/auth",
+  "/products",
+  "/sync",
+  "/questions",
+  "/ml-oauth",
+];
 
-  const proxyReq = http.request(options, (proxyRes) => {
-    res.writeHead(proxyRes.statusCode, proxyRes.headers);
-    proxyRes.pipe(res, { end: true });
+function isApiRequest(pathname) {
+  return API_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/") || pathname === p.replace(/\/$/, ""));
+}
+
+function buildApiPath(pathname) {
+  if (pathname.startsWith("/api")) return pathname;
+  return "/api" + pathname;
+}
+
+function proxyToApi(req, res, pathname) {
+  const targetPath = buildApiPath(pathname) + (req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "");
+
+  const chunks = [];
+  req.on("data", (chunk) => chunks.push(chunk));
+  req.on("end", () => {
+    const body = Buffer.concat(chunks);
+    const headers = {
+      ...req.headers,
+      host: `localhost:${API_PORT}`,
+      "content-length": body.length,
+    };
+
+    const options = {
+      hostname: "localhost",
+      port: API_PORT,
+      path: targetPath,
+      method: req.method,
+      headers,
+    };
+
+    const proxyReq = http.request(options, (proxyRes) => {
+      res.writeHead(proxyRes.statusCode, proxyRes.headers);
+      proxyRes.pipe(res, { end: true });
+    });
+
+    proxyReq.on("error", (err) => {
+      console.error("Proxy error:", err.message);
+      res.writeHead(502, { "content-type": "application/json" });
+      res.end(JSON.stringify({ error: "api_unavailable", message: err.message }));
+    });
+
+    proxyReq.write(body);
+    proxyReq.end();
   });
-
-  proxyReq.on("error", (err) => {
-    res.writeHead(502);
-    res.end(JSON.stringify({ error: "api_unavailable", message: err.message }));
-  });
-
-  req.pipe(proxyReq, { end: true });
 }
 
 const server = http.createServer((req, res) => {
   const url = new URL(req.url || "/", `http://${req.headers.host}`);
   let pathname = url.pathname;
 
-  if (pathname.startsWith("/api")) {
-    return proxyToApi(req, res);
+  console.log(`[serve] ${req.method} ${pathname}`);
+
+  if (isApiRequest(pathname)) {
+    return proxyToApi(req, res, pathname);
   }
 
   if (basePath && pathname.startsWith(basePath)) {
