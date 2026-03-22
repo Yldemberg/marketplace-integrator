@@ -116,7 +116,7 @@ router.post("/:id/answer", async (req, res) => {
       const webhookPayload = {
         pergunta: updated.pergunta,
         resposta: updated.resposta,
-        status: updated.status,
+        status: "UNANSWERED",
         item_id: updated.itemId,
         thumbnail: updated.thumbnail,
         permalink: updated.permalink,
