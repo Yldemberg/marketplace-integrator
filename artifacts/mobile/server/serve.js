@@ -107,9 +107,37 @@ function serveStaticFile(urlPath, res) {
 const landingPageTemplate = fs.readFileSync(TEMPLATE_PATH, "utf-8");
 const appName = getAppName();
 
+const API_PORT = 8080;
+
+function proxyToApi(req, res) {
+  const options = {
+    hostname: "localhost",
+    port: API_PORT,
+    path: req.url,
+    method: req.method,
+    headers: req.headers,
+  };
+
+  const proxyReq = http.request(options, (proxyRes) => {
+    res.writeHead(proxyRes.statusCode, proxyRes.headers);
+    proxyRes.pipe(res, { end: true });
+  });
+
+  proxyReq.on("error", (err) => {
+    res.writeHead(502);
+    res.end(JSON.stringify({ error: "api_unavailable", message: err.message }));
+  });
+
+  req.pipe(proxyReq, { end: true });
+}
+
 const server = http.createServer((req, res) => {
   const url = new URL(req.url || "/", `http://${req.headers.host}`);
   let pathname = url.pathname;
+
+  if (pathname.startsWith("/api")) {
+    return proxyToApi(req, res);
+  }
 
   if (basePath && pathname.startsWith(basePath)) {
     pathname = pathname.slice(basePath.length) || "/";
