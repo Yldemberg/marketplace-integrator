@@ -35,7 +35,7 @@ app.use(async (req, res, next) => {
   try {
     console.log("REQ RECEBIDA:", req.method, req.originalUrl);
 
-    await fetch("https://primary-production-8e04b.up.railway.app/webhook/feedback_pergunta_cliente", {
+    await fetch("https://workspace--yldemberg.replit.app/api/questions/webhook", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
