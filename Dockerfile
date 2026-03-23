@@ -1,15 +1,12 @@
 FROM node:22-alpine
-RUN npm install -g pnpm@9
+
 WORKDIR /app
 
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json tsconfig.json ./
-COPY lib/ ./lib/
-COPY artifacts/api-server/ ./artifacts/api-server/
+COPY . .
 
-RUN pnpm install --frozen-lockfile
-RUN pnpm --filter @workspace/api-server run build
+RUN npm install
 
 ENV NODE_ENV=production
 EXPOSE 8080
 
-CMD ["node", "--enable-source-maps", "artifacts/api-server/dist/index.mjs"]
+CMD ["node", "index.js"]
